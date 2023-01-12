@@ -18,7 +18,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,10 +30,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.center
 import androidx.compose.ui.graphics.Brush
@@ -158,6 +164,7 @@ class MainActivity : ComponentActivity() {
                     //Greeting("Android")
                     //JellyfishAnimatione()
                     //PerlinNoiseUI()
+
                     TheOctopusEscapes()
                     //ThisIsFine()
                 }
@@ -397,7 +404,8 @@ fun ThisIsFine() {
     Column() {
         Text(
             "THIS IS FINE.",
-            modifier = Modifier.padding(top = 250.dp)
+            modifier = Modifier
+                .padding(top = 250.dp)
                 .padding(start = 165.dp),
             style = TextStyle(
                 brush = SolidColor(Color(0xFF18100C)),
@@ -711,6 +719,9 @@ fun JellyfishAnimatione() {
                     .asComposeRenderEffect()
             }
     )
+
+
+
     val coroutineScope = rememberCoroutineScope()
     Image(
         vectorPainterFace, contentDescription = "",
@@ -890,7 +901,7 @@ val largeRadialGradient = object : ShaderBrush() {
     override fun createShader(size: Size): Shader {
         val biggerDimension = maxOf(size.height, size.width)
         return RadialGradientShader(
-            colors = listOf(Color(0xFF33464E), Color(0xFF000000)),
+            colors = listOf(Color(0xFF12A0DB), Color(0xFF000000)),
             center = size.center,
             radius = biggerDimension / 2.8f,
             colorStops = listOf(0f, 1f)
@@ -954,6 +965,8 @@ fun TheOctopusEscapes() {
         0.3f to Color(0xFFebb79b),
         0.8f to Color(0xFFe0885c)
     )
+
+
 
     val vectorPainterTentacles = rememberVectorPainter(
         defaultWidth = 590.46f.dp,
@@ -1143,11 +1156,79 @@ fun TheOctopusEscapes() {
     }
     val shader = RuntimeShader(PERLIN_NOISE)
 
-    Image(
-        vectorPainterTentacles, contentDescription = "Tentacle",
+    var pointerOffset by remember {
+        mutableStateOf(Offset(0f, 0f))
+    }
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(largeRadialGradient)
+            .pointerInput("dragging") {
+                detectDragGestures { change, dragAmount ->
+                    pointerOffset += dragAmount
+                }
+            }
+            .onSizeChanged {
+                pointerOffset = Offset(it.width / 2f, it.height / 2f)
+            }
+            .drawWithContent {
+                drawContent()
+                // draws a fully black area with a small keyhole at pointerOffset that’ll show part of the UI.
+                drawRect(
+                    Brush.radialGradient(
+                        listOf(Color.Transparent, Color.Black),
+                        center = pointerOffset,
+                        radius = 200.dp.toPx(),
+                    )
+                )
+            }
+    ) {
+        Image(
+            vectorPainterTentacles, contentDescription = "Tentacle",
+            modifier = Modifier
+                .fillMaxSize()
+                .background(largeRadialGradient)
+                .onSizeChanged { size ->
+                    shader.setFloatUniform(
+                        "resolution",
+                        size.width.toFloat(),
+                        size.height.toFloat()
+                    )
+                }
+                .graphicsLayer {
+                    shader.setFloatUniform("time", time)
+                    renderEffect = RenderEffect
+                        .createRuntimeShaderEffect(
+                            shader,
+                            "contents"
+                        )
+                        .asComposeRenderEffect()
+                }
+        )
+
+        Image(
+            vectorPainterHead, contentDescription = "Head",
+            modifier = Modifier
+                .fillMaxSize()
+        )
+
+        val coroutineScope = rememberCoroutineScope()
+        Image(
+            vectorPainterEyes, contentDescription = "Eyes",
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        coroutineScope.launch {
+                            instantBlinkAnimation()
+                        }
+                    }
+                }
+        )
+    }
+
+        Column(Modifier
+            //.padding(100.dp)
+            //.fillMaxSize()
             .onSizeChanged { size ->
                 shader.setFloatUniform(
                     "resolution",
@@ -1164,97 +1245,63 @@ fun TheOctopusEscapes() {
                     )
                     .asComposeRenderEffect()
             }
-    )
-
-    Image(
-        vectorPainterHead, contentDescription = "Head",
-        modifier = Modifier
-            .fillMaxSize()
-    )
-
-    val coroutineScope = rememberCoroutineScope()
-    Image(
-        vectorPainterEyes, contentDescription = "Eyes",
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures {
-                    coroutineScope.launch {
-                        instantBlinkAnimation()
-                    }
-                }
-            }
-    )
-
-    Column(Modifier
-        //.padding(100.dp)
-        //.fillMaxSize()
-        .onSizeChanged { size ->
-            shader.setFloatUniform(
-                "resolution",
-                size.width.toFloat(),
-                size.height.toFloat()
-            )
-        }
-        .graphicsLayer {
-            shader.setFloatUniform("time", time)
-            renderEffect = RenderEffect
-                .createRuntimeShaderEffect(
-                    shader,
-                    "contents"
+        ) {
+            Text(
+                "    The \nOctupus \n Escapes",
+                modifier = Modifier
+                    .padding(top = 55.dp)
+                    .padding(start = 100.dp),
+                style = TextStyle(
+                    brush = Brush.linearGradient(
+                        listOf(Color(0xFFC9E7F8), Color(0xFF687D8A))
+                    ),
+                    fontWeight = FontWeight.Bold, fontSize = 85.sp,
+                    fontFamily = FontFamily(Font(R.font.unkempt))
                 )
-                .asComposeRenderEffect()
+            )
+
+            Text(
+                "Maile \n Meloy",
+                modifier = Modifier
+                    .padding(top = 120.dp)
+                    .padding(start = 335.dp),
+                style = TextStyle(
+                    brush = Brush.linearGradient(
+                        listOf(Color(0xFFC9E7F8), Color(0xFF687D8A))
+                    ),
+                    fontWeight = FontWeight.Bold, fontSize = 40.sp,
+                    fontFamily = FontFamily(Font(R.font.unkempt)),
+                    textAlign = TextAlign.Center
+                )
+            )
+
+            Text(
+                "pictures by",
+                modifier = Modifier
+                    .padding(top = 20.dp)
+                    .padding(start = 355.dp),
+                style = TextStyle(
+                    brush = Brush.linearGradient(
+                        listOf(Color(0xFFC9E7F8), Color(0xFF687D8A))
+                    ),
+                    fontWeight = FontWeight.Bold, fontSize = 25.sp,
+                    fontFamily = FontFamily(Font(R.font.unkempt)),
+                    textAlign = TextAlign.Center
+                )
+            )
+            Text(
+                "Felicita \n Sala",
+                modifier = Modifier.padding(start = 355.dp),
+                style = TextStyle(
+                    brush = Brush.linearGradient(
+                        listOf(Color(0xFFC9E7F8), Color(0xFF687D8A))
+                    ),
+                    fontWeight = FontWeight.Bold, fontSize = 35.sp,
+                    fontFamily = FontFamily(Font(R.font.unkempt)),
+                    textAlign = TextAlign.Center
+                )
+            )
         }
-    ) {
-        Text(
-            "    The \nOctupus \n Escapes",
-            modifier = Modifier.padding(top = 55.dp)
-                .padding(start = 100.dp),
-            style = TextStyle(
-                brush = Brush.linearGradient(
-                    listOf(Color(0xFFC9E7F8),Color(0xFF687D8A))),
-                fontWeight = FontWeight.Bold, fontSize = 85.sp,
-                fontFamily = FontFamily(Font(R.font.unkempt))
-            )
-        )
-
-        Text(
-            "Maile \n Meloy",
-            modifier = Modifier.padding(top = 120.dp)
-                .padding(start = 335.dp),
-            style = TextStyle(
-                brush = Brush.linearGradient(
-                    listOf(Color(0xFFC9E7F8),Color(0xFF687D8A))),
-                fontWeight = FontWeight.Bold, fontSize = 40.sp,
-                fontFamily = FontFamily(Font(R.font.unkempt)),
-                textAlign = TextAlign.Center
-            )
-        )
-
-        Text(
-            "pictures by",
-            modifier = Modifier.padding(top = 20.dp)
-                .padding(start = 355.dp),
-            style = TextStyle(
-                brush = Brush.linearGradient(
-                    listOf(Color(0xFFC9E7F8),Color(0xFF687D8A))),
-                fontWeight = FontWeight.Bold, fontSize = 25.sp,
-                fontFamily = FontFamily(Font(R.font.unkempt)),
-                textAlign = TextAlign.Center
-            )
-        )
-        Text(
-            "Felicita \n Sala",
-            modifier = Modifier.padding(start = 355.dp),
-            style = TextStyle(
-                brush = Brush.linearGradient(
-                    listOf(Color(0xFFC9E7F8),Color(0xFF687D8A))),
-                fontWeight = FontWeight.Bold, fontSize = 35.sp,
-                fontFamily = FontFamily(Font(R.font.unkempt)),
-                textAlign = TextAlign.Center
-            )
-        )
-    }
 }
 
 
